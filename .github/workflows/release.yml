@@ -1,0 +1,33 @@
+name: Release
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  release:
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Preserve executable entrypoints
+        run: |
+          chmod +x build.sh test.sh install.sh scripts/install.sh scripts/package.sh 一键安装.command
+          git config user.name github-actions[bot]
+          git config user.email 41898282+github-actions[bot]@users.noreply.github.com
+          git add --chmod=+x build.sh test.sh install.sh scripts/install.sh scripts/package.sh 一键安装.command
+          if ! git diff --cached --quiet; then
+            git commit -m "Preserve executable installer entrypoints"
+            git push
+          fi
+      - name: Check public files and behavior
+        run: |
+          python3 scripts/privacy_check.py
+          ./test.sh
+      - name: Build universal installer
+        run: ./scripts/package.sh
+      - name: Publish release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          RELEASE_COMMIT="$(git rev-parse HEAD)"
+          gh release view v1.5.2 >/dev/null 2>&1 || gh release create v1.5.2 --target "$RELEASE_COMMIT" --title "Codex 电量管家 1.5.2" --notes-file docs/RELEASE.md
+          gh release upload v1.5.2 dist/CodexBattery-1.5.2-macOS.zip dist/SHA256SUMS.txt --clobber
